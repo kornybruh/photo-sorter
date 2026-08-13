@@ -102,6 +102,8 @@ def api_state():
 
 @app.route("/api/undecided_list")
 def api_undecided_list():
+    if config.SRC is None:
+        return jsonify({"files": []})
     section, sections = get_partition(request.args)
     try:
         limit = max(1, min(500, int(request.args.get("limit", 150))))
@@ -117,6 +119,8 @@ def api_undecided_list():
 
 @app.route("/api/photo/<path:fname>")
 def api_photo(fname):
+    if config.SRC is None:
+        return "not found", 404
     fname = os.path.basename(fname)
     path = os.path.join(config.SRC, fname)
     if not os.path.exists(path):
@@ -137,6 +141,8 @@ def api_photo(fname):
 
 @app.route("/api/photo_info/<path:fname>")
 def api_photo_info(fname):
+    if config.SRC is None:
+        return jsonify({"error": "not found"}), 404
     fname = os.path.basename(fname)
     path = os.path.join(config.SRC, fname)
     if not os.path.exists(path):
@@ -159,6 +165,8 @@ def _do_assign(fname, category):
 
 @app.route("/api/assign", methods=["POST"])
 def api_assign():
+    if config.SRC is None:
+        return jsonify({"ok": False, "error": "no folder selected"}), 400
     data = request.get_json(force=True)
     category = sanitize_name(data.get("category", ""))
     section, sections = get_partition(data)
@@ -192,6 +200,8 @@ def api_assign():
 
 @app.route("/api/bulk_assign", methods=["POST"])
 def api_bulk_assign():
+    if config.SRC is None:
+        return jsonify({"ok": False, "error": "no folder selected"}), 400
     data = request.get_json(force=True)
     category = sanitize_name(data.get("category", ""))
     files_in = [os.path.basename(f) for f in data.get("files", [])]
@@ -218,6 +228,8 @@ def api_bulk_assign():
 
 @app.route("/api/skip", methods=["POST"])
 def api_skip():
+    if config.SRC is None:
+        return jsonify({"ok": False, "error": "no folder selected"}), 400
     data = request.get_json(force=True)
     section, sections = get_partition(data)
     with state_lock:
@@ -236,6 +248,8 @@ def api_skip():
 
 @app.route("/api/undo", methods=["POST"])
 def api_undo():
+    if config.SRC is None:
+        return jsonify({"ok": False, "error": "no folder selected"}), 400
     data = request.get_json(force=True)
     section, sections = get_partition(data)
     with state_lock:
@@ -262,6 +276,8 @@ def api_undo():
 
 @app.route("/api/rename", methods=["POST"])
 def api_rename():
+    if config.SRC is None:
+        return jsonify({"ok": False, "error": "no folder selected"}), 400
     data = request.get_json(force=True)
     old_name = data.get("old", "")
     new_name = sanitize_name(data.get("new", ""))
@@ -294,6 +310,8 @@ def api_rename():
 
 @app.route("/api/delete_category", methods=["POST"])
 def api_delete_category():
+    if config.SRC is None:
+        return jsonify({"ok": False, "error": "no folder selected"}), 400
     data = request.get_json(force=True)
     category = sanitize_name(data.get("category", ""))
     with state_lock:
@@ -310,6 +328,8 @@ def api_delete_category():
 
 @app.route("/api/open_folder", methods=["POST"])
 def api_open_folder():
+    if config.SRC is None:
+        return jsonify({"ok": False, "error": "no folder selected"}), 400
     data = request.get_json(force=True)
     category = sanitize_name(data.get("category", ""))
     path = os.path.join(config.SORTED_DIR, category)
@@ -323,6 +343,8 @@ def api_open_folder():
 
 @app.route("/api/sync", methods=["POST"])
 def api_sync():
+    if config.SRC is None:
+        return jsonify({"ok": True, "changed": False})
     with state_lock:
         progress = load_progress()
         changed = False
@@ -339,6 +361,8 @@ def api_sync():
 def api_clear_all():
     if request.remote_addr not in LOCAL_ADDRESSES:
         return jsonify({"ok": False, "error": "Clear All can only be run from the host machine"}), 403
+    if config.SRC is None:
+        return jsonify({"ok": False, "error": "no folder selected"}), 400
     with state_lock:
         if os.path.exists(config.SORTED_DIR):
             for entry in os.listdir(config.SORTED_DIR):
@@ -360,6 +384,8 @@ def api_clear_all():
 
 @app.route("/api/next_person_number")
 def api_next_person_number():
+    if config.SRC is None:
+        return jsonify({"n": 1})
     progress = load_progress()
     return jsonify({"n": next_new_person_number(progress)})
 
@@ -369,6 +395,13 @@ def api_join():
     # Assigns (or re-fetches) a player/section number for this browser.
     # Only the host machine may set the room size; every other device just
     # gets auto-assigned the next free slot -- no manual picking.
+    if config.SRC is None:
+        # no folder picked yet -- the background sync loop calls this
+        # unconditionally from boot, before the pick-folder gate resolves,
+        # so this has to be a harmless no-op rather than touch ROOM_FILE
+        # (which is still None at this point)
+        return jsonify({"room_full": False, "section": 1, "sections": 1,
+                         "is_host": request.remote_addr in LOCAL_ADDRESSES, "no_folder": True})
     data = request.get_json(force=True)
     client_id = str(data.get("client_id") or "")[:64]
     requested_sections = data.get("requested_sections")
@@ -377,7 +410,12 @@ def api_join():
     with state_lock:
         room = load_room()
 
-        if requested_sections is not None and is_actual_host:
+        if requested_sections is not None:
+            # the setup/room-size controls are only shown to isHost on the
+            # client already; IP-based host detection is fragile across
+            # network setups (VPNs, changed DHCP leases, etc.) and blocking
+            # on it here just risked locking the real host out of their own
+            # controls, so it's not double-enforced server-side
             try:
                 n = max(1, min(16, int(requested_sections)))
                 room["sections"] = n
@@ -419,9 +457,12 @@ def api_kick():
     # frees up a section by removing whoever's assigned to it -- they get
     # auto-reassigned to a new slot (or told the room's full) next time
     # their browser's background sync re-confirms its assignment, no
-    # action needed on their end
-    if request.remote_addr not in LOCAL_ADDRESSES:
-        return jsonify({"ok": False, "error": "Only the host can kick players"}), 403
+    # action needed on their end. The Kick button only renders for isHost
+    # client-side; not double-enforced here via IP for the same reason
+    # room-size changes aren't -- that check is fragile across network
+    # setups and risks locking the real host out.
+    if config.SRC is None:
+        return jsonify({"ok": False, "error": "no folder selected"}), 400
     data = request.get_json(force=True)
     try:
         section = int(data.get("section"))
@@ -438,6 +479,8 @@ def api_kick():
 
 @app.route("/api/sections_progress")
 def api_sections_progress():
+    if config.SRC is None:
+        return jsonify({"sections": [], "grand_total": 0, "grand_reviewed": 0})
     try:
         sections = max(1, min(16, int(request.args.get("sections", 1))))
     except (TypeError, ValueError):

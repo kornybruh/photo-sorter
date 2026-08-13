@@ -236,13 +236,14 @@
       </div>
       <div class="modal-body">
         <div id="mpHostControls" class="d-none mb-3 p-2" style="background:var(--card); border:1px solid var(--border); border-radius:var(--r-md);">
-          <label class="form-label small mb-1 fw-bold">Room size (max players)</label>
-          <div class="d-flex gap-2">
-            <input type="number" id="mpSectionsInput" class="form-control form-control-sm" min="1" max="16" style="width:90px;">
-            <button class="btn btn-sm btn-primary" onclick="saveRoomSizeFromModal()">Save</button>
+          <label class="form-label small mb-1 fw-bold">Room size (max players): <span id="mpCurrentSize">--</span></label>
+          <div>
+            <button class="btn btn-sm btn-primary" onclick="location.reload()">
+              <i class="bi bi-arrow-clockwise"></i> Refresh to change room size
+            </button>
           </div>
-          <div class="form-text">Applies to everyone automatically within a few seconds -- no restart or
-            refresh needed, even for devices already sorting.</div>
+          <div class="form-text">Room size can only be changed by refreshing the page -- it'll ask you again
+            right away. Once you set it, it applies to everyone within a few seconds automatically.</div>
         </div>
 
         <div class="d-flex flex-column flex-sm-row gap-3 align-items-center mb-3 p-2" style="background:var(--card); border:1px solid var(--border); border-radius:var(--r-md);">
@@ -283,8 +284,8 @@
         </label>
         <input type="number" id="cooldownInput" class="form-control mb-3" min="0" max="2000" step="10" value="100">
         <div class="form-text mb-3">Default 100ms. Set to 0 to disable.</div>
-        <button class="btn btn-outline-light btn-sm" onclick="reopenSetup()">
-          <i class="bi bi-people"></i> Change multiplayer setup
+        <button class="btn btn-outline-light btn-sm" onclick="location.reload()">
+          <i class="bi bi-arrow-clockwise"></i> Refresh to change room size
         </button>
         <button class="btn btn-outline-light btn-sm" onclick="choosePhotoFolder()">
           <i class="bi bi-folder2-open"></i> Change photo folder

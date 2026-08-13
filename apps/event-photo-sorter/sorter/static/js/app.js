@@ -40,7 +40,11 @@ async function joinRoom(requestedSections) {
   const r = await api('/api/join', {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
   });
-  isHost = r.is_host;
+  // only ever upgrade isHost, never downgrade it based on a later poll --
+  // request.remote_addr can vary slightly between requests on machines with
+  // multiple network adapters/VPNs, and letting a later poll flip a real
+  // host back to false made the host-only controls silently disappear
+  if (r.is_host) isHost = true;
   if (!r.room_full) {
     mySection = r.section; mySections = r.sections;
   }
@@ -72,29 +76,6 @@ function retryJoin() {
   const el = bootstrap.Modal.getInstance(document.getElementById('roomFullModal'));
   if (el) el.hide();
   bootMultiplayer();
-}
-
-function reopenSetup() {
-  if (!isHost) {
-    setStatus('Only the host machine (the PC running the server) can change the room size.');
-    return;
-  }
-  const openSetup = () => {
-    document.getElementById('setupSections').value = mySections;
-    setupModalInstance = bootstrap.Modal.getOrCreateInstance(document.getElementById('setupModal'));
-    setupModalInstance.show();
-  };
-  const settingsModalEl = document.getElementById('settingsModal');
-  const settingsInstance = bootstrap.Modal.getInstance(settingsModalEl);
-  if (settingsInstance && settingsModalEl.classList.contains('show')) {
-    // wait for the fade-out + backdrop cleanup to finish before opening the
-    // next modal -- opening immediately after hide() races Bootstrap's own
-    // transition and can leave the new modal invisible behind a stale backdrop
-    settingsModalEl.addEventListener('hidden.bs.modal', openSetup, {once: true});
-    settingsInstance.hide();
-  } else {
-    openSetup();
-  }
 }
 
 async function confirmSetup(forcedSections) {
@@ -311,14 +292,6 @@ async function copyMpLanUrl() {
   navigator.clipboard && navigator.clipboard.writeText(el.value);
 }
 
-async function saveRoomSizeFromModal() {
-  let sections = parseInt(document.getElementById('mpSectionsInput').value, 10) || 1;
-  sections = Math.max(1, Math.min(16, sections));
-  await joinRoom(sections);
-  updateSectionBadge();
-  refreshMultiplayer();
-}
-
 document.getElementById('multiplayerModal').addEventListener('shown.bs.modal', async () => {
   const url = await getServerLanUrl();
   document.getElementById('mpLanUrlInput').value = url;
@@ -340,11 +313,8 @@ document.getElementById('multiplayerModal').addEventListener('hidden.bs.modal', 
 
 async function refreshMultiplayer() {
   const hostControls = document.getElementById('mpHostControls');
-  const sectionsInput = document.getElementById('mpSectionsInput');
   hostControls.classList.toggle('d-none', !isHost);
-  if (isHost && document.activeElement !== sectionsInput) {
-    sectionsInput.value = mySections;
-  }
+  document.getElementById('mpCurrentSize').textContent = mySections;
 
   const r = await api(`/api/sections_progress?sections=${mySections}`);
   const grandPct = r.grand_total ? Math.round((r.grand_reviewed / r.grand_total) * 100) : 0;
