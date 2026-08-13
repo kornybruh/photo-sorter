@@ -373,11 +373,17 @@ async function refreshMultiplayer() {
     const card = document.createElement('div');
     card.className = 'mp-card';
     card.style.borderLeftColor = color;
+    const kickBtn = (isHost && s.section !== mySection)
+      ? `<button class="btn btn-sm btn-outline-danger mt-2 w-100" onclick="kickPlayer(${s.section})">
+           <i class="bi bi-person-x"></i> Kick
+         </button>`
+      : '';
     card.innerHTML = `
       <div class="fw-bold small">Section ${s.section}${youTag}</div>
       <div class="small text-muted">${s.reviewed} / ${s.total} photos &middot; ${pct}%</div>
       <div class="mp-bar-wrap"><div class="mp-bar-fill" style="width:${pct}%; background:${color};"></div></div>
       <div class="small text-muted mt-1 text-truncate">${s.current ? 'on: ' + s.current : 'all done!'}</div>
+      ${kickBtn}
     `;
     cards.appendChild(card);
   }
@@ -390,6 +396,15 @@ async function refreshMultiplayer() {
       : 'Solo mode right now -- ask whoever is running the server (Settings on their end) to add more players.';
     cards.appendChild(hint);
   }
+}
+
+async function kickPlayer(section) {
+  if (!confirm(`Kick whoever is in section ${section}? They'll be reassigned to a new slot automatically -- no action needed on their end.`)) return;
+  await api('/api/kick', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({section})
+  });
+  refreshMultiplayer();
 }
 
 function partitionParams() {

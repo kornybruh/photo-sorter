@@ -414,6 +414,28 @@ def api_join():
     })
 
 
+@app.route("/api/kick", methods=["POST"])
+def api_kick():
+    # frees up a section by removing whoever's assigned to it -- they get
+    # auto-reassigned to a new slot (or told the room's full) next time
+    # their browser's background sync re-confirms its assignment, no
+    # action needed on their end
+    if request.remote_addr not in LOCAL_ADDRESSES:
+        return jsonify({"ok": False, "error": "Only the host can kick players"}), 403
+    data = request.get_json(force=True)
+    try:
+        section = int(data.get("section"))
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "invalid section"}), 400
+    with state_lock:
+        room = load_room()
+        to_remove = [cid for cid, sec in room["assignments"].items() if sec == section]
+        for cid in to_remove:
+            del room["assignments"][cid]
+        save_room(room)
+    return jsonify({"ok": True, "kicked": len(to_remove)})
+
+
 @app.route("/api/sections_progress")
 def api_sections_progress():
     try:
