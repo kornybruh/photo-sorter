@@ -26,7 +26,6 @@
       <div class="d-flex align-items-center gap-2">
         <span id="sectionBadge" class="badge text-bg-dark badge-progress d-none"></span>
         <span id="myProgressBadge" class="badge text-bg-info badge-progress d-none"></span>
-        <span id="progressBadge" class="badge text-bg-secondary badge-progress">-- / --</span>
         <span id="sessionTimer" class="badge text-bg-dark badge-progress" title="Time since you opened this page"><i class="bi bi-stopwatch"></i> 00:00:00</span>
         <button id="multiplayerBtn" class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#multiplayerModal" title="Multiplayer progress">
           <i class="bi bi-people-fill"></i>
@@ -115,7 +114,7 @@
   <div class="modal-dialog">
     <div class="modal-content text-center">
       <div class="modal-header border-0 justify-content-center">
-        <h5 class="modal-title">👋 Hi!</h5>
+        <h5 class="modal-title"><i class="bi bi-emoji-smile-fill text-primary"></i> Hi!</h5>
       </div>
       <div class="modal-body pb-4">
         <p>Pick the folder of photos you want to sort. A <code>sorted/</code> folder will be created inside
@@ -146,6 +145,9 @@
         <input type="number" id="setupSections" class="form-control" min="1" max="16" value="1">
       </div>
       <div class="modal-footer">
+        <button class="btn btn-outline-light" onclick="confirmSetup(1)">
+          <i class="bi bi-person"></i> Solo mode (just me)
+        </button>
         <button class="btn btn-primary" onclick="confirmSetup()">Start sorting</button>
       </div>
     </div>
@@ -176,7 +178,7 @@
   <div class="modal-dialog">
     <div class="modal-content text-center">
       <div class="modal-body py-4">
-        <div class="display-6 mb-2">😱 OH NO!</div>
+        <div class="display-6 mb-2"><i class="bi bi-exclamation-triangle-fill text-warning"></i> OH NO!</div>
         <div class="fs-5 fw-bold mb-2">Max players reached!</div>
         <div class="text-muted small">Every slot in this room is already taken. Please contact the host to
           increase the room size, then try again.</div>
@@ -193,7 +195,7 @@
   <div class="modal-dialog">
     <div class="modal-content text-center">
       <div class="modal-body py-4">
-        <div class="display-6 mb-2">📡💀</div>
+        <div class="display-6 mb-2"><i class="bi bi-wifi-off text-danger"></i></div>
         <div class="fs-5 fw-bold mb-2">YO... the host is gone!</div>
         <div class="text-muted small">Lost connection to the server. The host's computer may have closed the
           app, gone to sleep, or dropped off the WiFi. Ask them to check, then try again.</div>

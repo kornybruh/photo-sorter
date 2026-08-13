@@ -1,11 +1,16 @@
 # Event Photo Sorter
 
-A local, self-hosted web app for sorting thousands of event photos into
-people/categories quickly — built because manually dragging hundreds (or
-thousands) of photos into folders one at a time is miserable, and existing
-photo-management tools don't make it easy to say "this batch is Person A,
-that batch is Person B, this pile is just venue shots" at speed, let alone
-split the work across multiple people at the same event.
+## Why this exists
+
+I was photographing an event and ended up with over a thousand photos that
+all needed sorting by person — manually dragging each one into folders one
+at a time was miserable, and existing photo-management tools don't make it
+easy to say "this batch is Person A, that batch is Person B, this pile is
+just venue shots" at speed. My friend wanted to help sort too, but there was
+no easy way for two of us to split the work on the same batch without
+stepping on each other. So I built this: a local, self-hosted web app that
+files photos into categories fast, with live multiplayer support so more
+than one person can sort the same event at once.
 
 Point the app at a folder of photos, click through them filing each one into
 a category (or select a bunch at once in bulk mode), and it copies them into
@@ -67,6 +72,10 @@ apps/event-photo-sorter/
   (camera, ISO, aperture, focal length), click-to-zoom lightbox, and more.
 - Nothing here ever touches your original photos — everything happens via
   copies into `sorted/<category>/`.
+- **Progress is saved as you go** — every decision is written to disk
+  immediately, so you can close the app (or lose power, or just take a
+  break) mid-sort and pick up exactly where you left off next time, with
+  nothing lost.
 
 ## Notes
 

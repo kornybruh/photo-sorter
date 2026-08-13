@@ -97,8 +97,10 @@ function reopenSetup() {
   }
 }
 
-async function confirmSetup() {
-  let sections = parseInt(document.getElementById('setupSections').value, 10) || 1;
+async function confirmSetup(forcedSections) {
+  let sections = forcedSections !== undefined
+    ? forcedSections
+    : parseInt(document.getElementById('setupSections').value, 10) || 1;
   sections = Math.max(1, Math.min(16, sections));
   await joinRoom(sections);  // saves server-side, never errors -- reassigns anyone who no longer fits
   if (setupModalInstance) setupModalInstance.hide();
@@ -273,9 +275,16 @@ function initStripResize() {
 function startCategoryAutoSync() {
   setInterval(async () => {
     if (document.hidden) return;
+    // re-confirm our own player number every tick -- if the host changed
+    // the room size, our cached mySection/mySections would otherwise stay
+    // stale forever (this used to require reloading the page to pick up)
+    const joinResult = await joinRoom();
+    if (joinResult.room_full) {
+      bootstrap.Modal.getOrCreateInstance(document.getElementById('roomFullModal')).show();
+      return;
+    }
+    updateSectionBadge();
     const s = await api(`/api/state?${partitionParams()}`);
-    const grandPct = s.total ? Math.round((s.reviewed / s.total) * 100) : 0;
-    document.getElementById('progressBadge').textContent = `${s.reviewed} / ${s.total} reviewed (${grandPct}%)`;
     updateProgressBar(s.reviewed, s.total);
     updateMyProgress(s.section_reviewed, s.section_total);
     renderStrip(s.categories);
@@ -471,8 +480,6 @@ function updateProgressBar(reviewed, total) {
 
 async function refreshState() {
   const s = await api(`/api/state?${partitionParams()}`);
-  const grandPct = s.total ? Math.round((s.reviewed / s.total) * 100) : 0;
-  document.getElementById('progressBadge').textContent = `${s.reviewed} / ${s.total} reviewed (${grandPct}%)`;
   updateProgressBar(s.reviewed, s.total);
   updateSectionBadge();
   updateMyProgress(s.section_reviewed, s.section_total);
