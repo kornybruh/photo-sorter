@@ -4,7 +4,6 @@ __pycache__/
 
 # app-generated, machine-specific -- never belongs in the repo
 apps/event-photo-sorter/last_folder.json
-apps/event-photo-sorter/run_sorter.bat
 
 # just in case anyone ever runs the app from inside this repo by mistake
 sorted/

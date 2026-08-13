@@ -35,6 +35,25 @@ anytime from Settings → *Change photo folder*).
 You can install this once and reuse it for every event — it doesn't need to
 live inside the photo folder itself.
 
+## Project layout
+
+```
+apps/event-photo-sorter/
+├── web_sorter.py           entry point -- just calls sorter.main()
+├── run_sorter.bat           double-click launcher (Windows)
+├── requirements.txt
+└── sorter/                  the actual app, split by concern
+    ├── config.py            constants + "which folder is active" state
+    ├── storage.py            progress / skipped / multiplayer-room JSON files
+    ├── photos.py             image decoding, thumbnails, EXIF
+    ├── logic.py              categories, queue, splitting work across players
+    ├── network.py            LAN IP / "is this the host" detection
+    ├── app.py                the Flask app instance
+    ├── routes.py             all HTTP + JSON API endpoints
+    ├── templates/index.html  page markup
+    └── static/               css/style.css, js/app.js
+```
+
 ## What it does
 
 - Click a category card (or type a new one) to file the photo currently on
