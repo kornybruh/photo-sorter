@@ -3,6 +3,7 @@ Everything that touches actual photo files: listing, fast decoding for
 previews/thumbnails, and pulling EXIF details.
 """
 import os
+from datetime import datetime
 
 from PIL import Image, ImageOps
 
@@ -104,3 +105,15 @@ def get_photo_info(path):
     except Exception:
         pass
     return info
+
+
+def photo_datetime(path):
+    """EXIF capture time as a datetime, or None if missing/unparseable --
+    used to spot burst/duplicate shots (see routes.api_state)."""
+    date_str = get_photo_info(path).get("date")
+    if not date_str:
+        return None
+    try:
+        return datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return None

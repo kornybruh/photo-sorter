@@ -488,12 +488,14 @@ async function refreshState() {
     loadPhotoDetails(s.current);
     currentRotation = s.current_rotation || 0;
     fitRotatedImage(img, currentRotation);
+    showDuplicateHint(s.duplicate_hint);
   } else {
     img.classList.add('d-none');
     doneMsg.classList.remove('d-none');
     setStatus('Done! Progress saved.');
     document.getElementById('photoDetails').innerHTML = '';
     currentRotation = 0;
+    showDuplicateHint(null);
   }
   renderStrip(s.categories);
   preloadUpcoming(s.upcoming || []);
@@ -519,6 +521,32 @@ async function loadPhotoDetails(fname) {
   if (info.fnumber) chips.push(info.fnumber);
   if (info.focal_length) chips.push(info.focal_length);
   el.innerHTML = chips.map(c => `<span>${c}</span>`).join('');
+}
+
+// ---------- duplicate/burst hint: a suggestion, never an automatic decision ----------
+let dupHintCategories = [];
+
+function showDuplicateHint(hint) {
+  const bar = document.getElementById('dupHintBar');
+  if (!hint) {
+    dupHintCategories = [];
+    bar.classList.add('d-none');
+    return;
+  }
+  dupHintCategories = hint.categories;
+  document.getElementById('dupHintPrevName').textContent = hint.file;
+  document.getElementById('dupHintCatLabel').textContent = hint.categories.map(categoryLabel).join(', ');
+  bar.classList.remove('d-none');
+}
+
+async function useSameAsPrevious() {
+  if (!dupHintCategories.length || !canAct()) return;
+  if (dupHintCategories.length > 1) {
+    await apiPost('/api/assign_multi', {categories: dupHintCategories});
+  } else {
+    await apiPost('/api/assign', {category: dupHintCategories[0]});
+  }
+  await refreshState();
 }
 
 function preloadUpcoming(upcoming) {

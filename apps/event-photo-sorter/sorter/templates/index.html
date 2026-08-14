@@ -23,7 +23,7 @@
   <div id="stickyTop">
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
       <h4 class="m-0"><i class="bi bi-images"></i> Event Photo Sorter
-        <span class="badge text-bg-secondary" style="font-size:.55rem; vertical-align:middle;" title="Bumped on every update -- if this doesn't match what you expect, the server needs a full restart, not just a page refresh">v3</span>
+        <span class="badge text-bg-secondary" style="font-size:.55rem; vertical-align:middle;" title="Bumped on every update -- if this doesn't match what you expect, the server needs a full restart, not just a page refresh">v5</span>
       </h4>
       <div class="d-flex align-items-center gap-2">
         <div class="status-cluster">
@@ -130,6 +130,14 @@
       </div>
 
       <div id="photoDetails" class="small d-flex flex-wrap gap-2 mb-2"></div>
+
+      <div id="dupHintBar" class="d-none d-flex flex-wrap align-items-center gap-2 mb-2 p-2"
+           style="background:var(--card); border:1px solid var(--border); border-radius:var(--r-sm);">
+        <i class="bi bi-stars text-warning"></i>
+        <span class="small">Looks like a burst/retake of <span id="dupHintPrevName" class="text-muted"></span>
+          &mdash; last filed as <strong id="dupHintCatLabel"></strong>.</span>
+        <button class="btn btn-sm btn-outline-warning ms-auto" onclick="useSameAsPrevious()">Use same category</button>
+      </div>
     </div>
   </div>
 

@@ -17,7 +17,7 @@ from .logic import (
     sanitize_name, existing_categories, category_last_photo, categories_of,
     next_new_person_number, first_undecided, get_partition, partition_slice,
 )
-from .photos import list_files, fast_open, get_photo_info
+from .photos import list_files, fast_open, get_photo_info, photo_datetime
 from .storage import (
     load_progress, save_progress, load_skipped, save_skipped,
     load_room, save_room, load_rotations, save_rotations,
@@ -68,8 +68,9 @@ def api_pick_folder():
 @app.route("/api/state")
 def api_state():
     if config.SRC is None:
-        return jsonify({"no_folder": True, "current": None, "current_rotation": 0, "total": 0, "reviewed": 0,
-                         "section_total": 0, "section_reviewed": 0, "upcoming": [], "categories": []})
+        return jsonify({"no_folder": True, "current": None, "current_rotation": 0, "duplicate_hint": None,
+                         "total": 0, "reviewed": 0, "section_total": 0, "section_reviewed": 0,
+                         "upcoming": [], "categories": []})
     section, sections = get_partition(request.args)
     with state_lock:
         files = list_files()
@@ -89,10 +90,12 @@ def api_state():
         section_total = len(my_files)
         section_reviewed = sum(1 for f in my_files if f in progress)
         current_rotation = load_rotations().get(current, 0) if current else 0
+        duplicate_hint = _find_duplicate_hint(my_files, idx, progress)
 
         return jsonify({
             "current": current,
             "current_rotation": current_rotation,
+            "duplicate_hint": duplicate_hint,
             "total": len(files),
             "reviewed": len(progress),
             "section_total": section_total,
@@ -309,6 +312,29 @@ def api_photo_info(fname):
     return jsonify(get_photo_info(path))
 
 
+DUPLICATE_HINT_WINDOW_SECS = 2  # burst/retake shots are usually within a second or two of each other
+
+
+def _find_duplicate_hint(my_files, idx, progress):
+    # a *suggestion*, not an automatic decision -- EXIF timestamps can be a
+    # second or two off, and consecutive burst shots aren't always true
+    # duplicates (someone blinked), so this only ever offers a one-click
+    # shortcut, it never files or hides anything on its own
+    if idx <= 0 or idx >= len(my_files):
+        return None
+    current, prev_fname = my_files[idx], my_files[idx - 1]
+    prev_entry = progress.get(prev_fname)
+    if prev_entry is None:
+        return None
+    cur_dt = photo_datetime(os.path.join(config.SRC, current))
+    prev_dt = photo_datetime(os.path.join(config.SRC, prev_fname))
+    if not cur_dt or not prev_dt:
+        return None
+    if abs((cur_dt - prev_dt).total_seconds()) > DUPLICATE_HINT_WINDOW_SECS:
+        return None
+    return {"file": prev_fname, "categories": categories_of(prev_entry)}
+
+
 def _copy_into_category(fname, category):
     cat_dir = os.path.join(config.SORTED_DIR, category)
     os.makedirs(cat_dir, exist_ok=True)
@@ -322,10 +348,20 @@ def _copy_into_category(fname, category):
         img.rotate(-degrees, expand=True).save(dest, quality=95)
 
 
+def _set_progress(progress, fname, value):
+    # dicts only move a key to the end on *insert*, not on updating an
+    # existing key's value -- popping first means a re-filed photo (undo,
+    # unfile, then re-assign) lands at the end again, so category_last_photo
+    # (which picks "last matching entry" via iteration order) reflects true
+    # recency instead of the photo's original, possibly-stale position
+    progress.pop(fname, None)
+    progress[fname] = value
+
+
 def _do_assign(fname, category):
     _copy_into_category(fname, category)
     progress = load_progress()
-    progress[fname] = category
+    _set_progress(progress, fname, category)
     save_progress(progress)
     skipped = load_skipped()
     if fname in skipped:
@@ -411,7 +447,7 @@ def api_assign_multi():
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 500
         progress = load_progress()
-        progress[fname] = categories if len(categories) > 1 else categories[0]
+        _set_progress(progress, fname, categories if len(categories) > 1 else categories[0])
         save_progress(progress)
         skipped = load_skipped()
         if fname in skipped:
@@ -443,7 +479,7 @@ def api_bulk_assign():
                 shutil.copy2(src, os.path.join(cat_dir, fname))
             except Exception:
                 continue
-            progress[fname] = category
+            _set_progress(progress, fname, category)
             count += 1
         save_progress(progress)
     return jsonify({"ok": True, "count": count})
