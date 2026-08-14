@@ -2,6 +2,8 @@ let currentFile = null;
 let cooldownUntil = 0;
 let bulkMode = false;
 let bulkSelected = new Set();
+let multiCatMode = false;
+let multiCatSelected = new Set();
 const preloadedUrls = new Set();
 let mySection = 1, mySections = 1;
 let isHost = false;
@@ -340,6 +342,8 @@ async function refreshMultiplayer() {
 
     const youTag = (s.section === mySection)
       ? ' <span class="badge text-bg-info" style="font-size:.6rem;">you</span>' : '';
+    const onlineDot = `<span class="mp-dot ${s.online ? 'mp-dot-online' : 'mp-dot-offline'}"
+      title="${s.online ? 'Active in the last few seconds' : 'Not active recently -- may have closed the page'}"></span>`;
     const card = document.createElement('div');
     card.className = 'mp-card';
     card.style.borderLeftColor = color;
@@ -349,7 +353,7 @@ async function refreshMultiplayer() {
          </button>`
       : '';
     card.innerHTML = `
-      <div class="fw-bold small">Section ${s.section}${youTag}</div>
+      <div class="fw-bold small">${onlineDot}Section ${s.section}${youTag}</div>
       <div class="small text-muted">${s.reviewed} / ${s.total} photos &middot; ${pct}%</div>
       <div class="mp-bar-wrap"><div class="mp-bar-fill" style="width:${pct}%; background:${color};"></div></div>
       <div class="small text-muted mt-1 text-truncate">${s.current ? 'on: ' + s.current : 'all done!'}</div>
@@ -395,6 +399,11 @@ function copyLanUrl() {
   el.select();
   navigator.clipboard && navigator.clipboard.writeText(el.value);
 }
+function exportSummary() {
+  // plain navigation, not fetch -- the response is a file attachment, so
+  // the browser downloads it and stays on the page, no blob/anchor dance needed
+  window.location.href = '/api/export_summary';
+}
 
 // ---------- click-cooldown guard ----------
 function canAct() {
@@ -407,9 +416,9 @@ function canAct() {
 }
 function flashCooldown(ms) {
   if (ms <= 0) return;
-  document.querySelectorAll('.toolbar .btn, .cat-card').forEach(el => el.classList.add('is-cooling'));
+  document.querySelectorAll('.toolbar-primary .btn, .toolbar-secondary .btn, .cat-card').forEach(el => el.classList.add('is-cooling'));
   setTimeout(() => {
-    document.querySelectorAll('.toolbar .btn, .cat-card').forEach(el => el.classList.remove('is-cooling'));
+    document.querySelectorAll('.toolbar-primary .btn, .toolbar-secondary .btn, .cat-card').forEach(el => el.classList.remove('is-cooling'));
   }, ms);
 }
 
@@ -477,11 +486,14 @@ async function refreshState() {
     img.src = `/api/photo/${encodeURIComponent(s.current)}?size=1600`;
     setStatus(`Now showing: ${s.current}`);
     loadPhotoDetails(s.current);
+    currentRotation = s.current_rotation || 0;
+    fitRotatedImage(img, currentRotation);
   } else {
     img.classList.add('d-none');
     doneMsg.classList.remove('d-none');
     setStatus('Done! Progress saved.');
     document.getElementById('photoDetails').innerHTML = '';
+    currentRotation = 0;
   }
   renderStrip(s.categories);
   preloadUpcoming(s.upcoming || []);
@@ -530,10 +542,11 @@ function buildCategoryCard(c) {
   card.className = 'cat-card';
   card.onclick = (e) => {
     if (e.target.closest('.mini-btns')) return;
-    if (bulkMode) bulkAssignToCategory(c.name);
-    else assign(c.name);
+    if (bulkMode) { bulkAssignToCategory(c.name); return; }
+    if (multiCatMode) { toggleMultiCatSelect(c.name); return; }
+    assign(c.name);
   };
-  card.addEventListener('mouseenter', (e) => showHoverPreview(c.thumb, e));
+  card.addEventListener('mouseenter', (e) => showHoverPreview(c.name, c.thumb, e));
   card.addEventListener('mousemove', positionHoverPreview);
   card.addEventListener('mouseleave', hideHoverPreview);
   // touchscreens have no hover -- hold the card to preview it instead of tapping straight through
@@ -543,7 +556,7 @@ function buildCategoryCard(c) {
     const t = e.touches[0];
     touchPreviewTimer = setTimeout(() => {
       touchPreviewShown = true;
-      showHoverPreview(c.thumb, {clientX: t.clientX, clientY: t.clientY});
+      showHoverPreview(c.name, c.thumb, {clientX: t.clientX, clientY: t.clientY});
     }, 400);
   }, {passive: true});
   card.addEventListener('touchmove', () => clearTimeout(touchPreviewTimer));
@@ -559,15 +572,16 @@ function buildCategoryCard(c) {
     if (e.dataTransfer.getData('text/plain') === 'current-photo') assign(c.name);
   });
 
+  // the filed copy, not the original -- already has any manual rotation baked in
   const thumbHtml = c.thumb
-    ? `<img src="/api/photo/${encodeURIComponent(c.thumb)}?size=200" loading="lazy">`
+    ? `<img src="/api/category_photo/${encodeURIComponent(c.name)}/${encodeURIComponent(c.thumb)}?size=200" loading="lazy">`
     : `<div class="noimg">?</div>`;
 
   card.innerHTML = `
     ${thumbHtml}
     <div class="cat-label"></div>
     <div class="mini-btns">
-      <button class="btn btn-info" onclick="openFolder('${escapeJs(c.name)}')" title="Open in Explorer"><i class="bi bi-folder2-open"></i></button>
+      <button class="btn btn-info" onclick="openCategoryGallery('${escapeJs(c.name)}')" title="View photos in this category"><i class="bi bi-folder2-open"></i></button>
       <button class="btn btn-primary" onclick="renameCategory('${escapeJs(c.name)}')" title="Rename"><i class="bi bi-pencil"></i></button>
       <button class="btn btn-danger" onclick="deleteCategory('${escapeJs(c.name)}')" title="Delete whole category (back to unsorted)"><i class="bi bi-trash"></i></button>
     </div>`;
@@ -598,6 +612,9 @@ function renderStrip(categories) {
     }
     stripOrderCache = [];
     stripState = {};
+    catHighlightIndex = -1;
+    multiCatSelected.clear();
+    updateMultiCatBar();
     return;
   }
 
@@ -617,7 +634,7 @@ function renderStrip(categories) {
       }
       if (prev.thumb !== c.thumb && c.thumb) {
         const imgEl = prev.el.querySelector('img');
-        const url = `/api/photo/${encodeURIComponent(c.thumb)}?size=200`;
+        const url = `/api/category_photo/${encodeURIComponent(c.name)}/${encodeURIComponent(c.thumb)}?size=200`;
         if (imgEl) {
           imgEl.src = url;
         } else {
@@ -633,6 +650,7 @@ function renderStrip(categories) {
   // categories were added/removed/reordered -- rebuild (rare, so any
   // flicker here is acceptable; routine picks stay on the fast path above)
   const scrollPos = outer.scrollLeft;
+  const highlightedName = (catHighlightIndex >= 0) ? stripOrderCache[catHighlightIndex] : null;
   outer.innerHTML = '';
   stripState = {};
   stripOrderCache = newOrder;
@@ -642,15 +660,122 @@ function renderStrip(categories) {
     stripState[c.name] = card;
   }
   outer.scrollLeft = scrollPos;
+  // keep the same category highlighted across a rebuild if it still exists
+  // (e.g. someone else's pick changed a count/thumb elsewhere in the list);
+  // otherwise clamp so a deleted category doesn't leave a dangling index
+  catHighlightIndex = highlightedName ? stripOrderCache.indexOf(highlightedName)
+    : Math.min(catHighlightIndex, stripOrderCache.length - 1);
+  updateCategoryHighlightVisual();
+  // drop any multi-select picks for categories that no longer exist (e.g.
+  // one just got deleted mid-selection), then repaint what's left
+  for (const name of Array.from(multiCatSelected)) {
+    if (!stripOrderCache.includes(name)) multiCatSelected.delete(name);
+  }
+  updateMultiCatVisual();
+  updateMultiCatBar();
 }
 
 function escapeJs(s) { return s.replace(/'/g, "\\'"); }
 
+// ---------- multi-category mode: file one photo into several categories at once ----------
+function toggleMultiCatMode() {
+  multiCatMode = !multiCatMode;
+  if (!multiCatMode) {
+    multiCatSelected.clear();
+    updateMultiCatVisual();
+  }
+  document.getElementById('multiCatModeBtn').classList.toggle('active', multiCatMode);
+  updateMultiCatBar();
+}
+
+function toggleMultiCatSelect(name) {
+  if (multiCatSelected.has(name)) multiCatSelected.delete(name);
+  else multiCatSelected.add(name);
+  updateMultiCatVisual();
+  updateMultiCatBar();
+}
+
+function updateMultiCatVisual() {
+  for (const name of stripOrderCache) {
+    const card = stripState[name];
+    if (card) card.el.classList.toggle('multi-selected', multiCatSelected.has(name));
+  }
+}
+
+function updateMultiCatBar() {
+  const bar = document.getElementById('multiCatBar');
+  bar.classList.toggle('d-none', !multiCatMode);
+  document.getElementById('multiCatCount').textContent = `${multiCatSelected.size} selected`;
+}
+
+async function assignMultiCategory() {
+  if (!currentFile || multiCatSelected.size === 0 || !canAct()) return;
+  await apiPost('/api/assign_multi', {categories: Array.from(multiCatSelected)});
+  multiCatSelected.clear();
+  updateMultiCatVisual();
+  updateMultiCatBar();
+  await refreshState();
+}
+
+// ---------- keyboard shortcuts: arrows to pick a category, Enter to file into it ----------
+let catHighlightIndex = -1;
+
+function updateCategoryHighlightVisual() {
+  for (const name of stripOrderCache) {
+    const card = stripState[name];
+    if (card) card.el.classList.remove('kbd-focus');
+  }
+  if (catHighlightIndex >= 0 && catHighlightIndex < stripOrderCache.length) {
+    const card = stripState[stripOrderCache[catHighlightIndex]];
+    if (card) {
+      card.el.classList.add('kbd-focus');
+      card.el.scrollIntoView({block: 'nearest', inline: 'nearest', behavior: 'smooth'});
+    }
+  }
+}
+
+function moveCategoryHighlight(delta) {
+  if (!stripOrderCache.length) return;
+  catHighlightIndex = (catHighlightIndex === -1)
+    ? (delta > 0 ? 0 : stripOrderCache.length - 1)
+    : Math.max(0, Math.min(stripOrderCache.length - 1, catHighlightIndex + delta));
+  updateCategoryHighlightVisual();
+}
+
+function assignHighlighted() {
+  if (catHighlightIndex < 0 || catHighlightIndex >= stripOrderCache.length) return;
+  const name = stripOrderCache[catHighlightIndex];
+  if (bulkMode) bulkAssignToCategory(name);
+  else assign(name);
+}
+
+document.addEventListener('keydown', (e) => {
+  const tag = (e.target.tagName || '').toLowerCase();
+  // don't hijack arrows/enter while someone's typing in a field, or while
+  // any modal (settings, setup, lightbox...) has its own use for those keys
+  if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) return;
+  if (document.querySelector('.modal.show')) return;
+  // the strip runs left-to-right in normal/swapped layout but wraps into a
+  // multi-row grid in side-by-side layout -- rather than branch on layout,
+  // both arrow pairs just walk the same flat, currently-visible order
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    moveCategoryHighlight(-1);
+  } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+    e.preventDefault();
+    moveCategoryHighlight(1);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    assignHighlighted();
+  }
+});
+
 // ---------- hover preview ----------
-function showHoverPreview(thumbFile, e) {
+function showHoverPreview(category, thumbFile, e) {
   if (!thumbFile) return;
   const box = document.getElementById('hoverPreview');
-  document.getElementById('hoverPreviewImg').src = `/api/photo/${encodeURIComponent(thumbFile)}?size=500`;
+  // the filed copy, not the original -- already has any manual rotation baked in
+  document.getElementById('hoverPreviewImg').src = `/api/category_photo/${encodeURIComponent(category)}/${encodeURIComponent(thumbFile)}?size=500`;
   box.style.display = 'block';
   positionHoverPreview(e);
 }
@@ -668,6 +793,54 @@ function openLightbox() {
   if (!currentFile) return;
   document.getElementById('lightboxImg').src = `/api/photo/${encodeURIComponent(currentFile)}?size=2400`;
   new bootstrap.Modal(document.getElementById('lightboxModal')).show();
+}
+// the modal is display:none until this fires, so its box has zero size
+// before then -- fitRotatedImage needs real dimensions to scale against
+document.getElementById('lightboxModal').addEventListener('shown.bs.modal', () => {
+  fitRotatedImage(document.getElementById('lightboxImg'), currentRotation);
+});
+
+// ---------- photo rotation (fixes sideways/upside-down shots before filing) ----------
+let currentRotation = 0;
+
+function fitRotatedImage(imgEl, deg) {
+  if (!imgEl) return;
+  deg = ((deg % 360) + 360) % 360;
+  if (deg === 0) { imgEl.style.transform = ''; return; }
+  const apply = () => {
+    const wrap = imgEl.parentElement;
+    const cw = wrap.clientWidth, ch = wrap.clientHeight;
+    const iw = imgEl.naturalWidth, ih = imgEl.naturalHeight;
+    if (!cw || !ch || !iw || !ih) { imgEl.style.transform = `rotate(${deg}deg)`; return; }
+    // a 90/270 rotation swaps the image's on-screen box to ih x iw, which
+    // object-fit:contain doesn't account for (it only sizes the unrotated
+    // box) -- scale down so the rotated box still fits inside its wrapper
+    const swapped = (deg === 90 || deg === 270);
+    const scale = swapped ? Math.min(cw / ih, ch / iw, 1) : 1;
+    imgEl.style.transform = `rotate(${deg}deg) scale(${scale})`;
+  };
+  if (imgEl.complete && imgEl.naturalWidth) apply();
+  else imgEl.onload = apply;
+}
+
+async function rotatePhoto(delta) {
+  if (!currentFile || !canAct()) return;
+  const r = await apiPost('/api/rotate', {file: currentFile, delta});
+  currentRotation = r.rotation;
+  fitRotatedImage(document.getElementById('photo'), currentRotation);
+}
+
+async function deleteOriginalPhoto() {
+  if (!currentFile) return;
+  const sure = confirm(
+    `Permanently delete "${currentFile}" from disk?\n\n` +
+    `This removes the actual original photo, not just a sorted copy -- ` +
+    `unlike everything else in this app, it cannot be undone.`
+  );
+  if (!sure) return;
+  if (!canAct()) return;
+  await apiPost('/api/delete_original', {file: currentFile});
+  await refreshState();
 }
 
 // ---------- drag and drop of the current photo ----------
@@ -708,6 +881,40 @@ async function undo() {
   await refreshState();
 }
 
+// ---------- Undo History: see what you filed lately, undo a specific one ----------
+document.getElementById('undoHistoryModal').addEventListener('shown.bs.modal', loadUndoHistory);
+
+async function loadUndoHistory() {
+  const r = await api(`/api/undo_history?${partitionParams()}`);
+  const list = document.getElementById('undoHistoryList');
+  list.innerHTML = '';
+  if (!r.history.length) {
+    list.innerHTML = '<div class="text-muted small p-2">Nothing to undo yet.</div>';
+    return;
+  }
+  for (const h of r.history) {
+    const catLabels = h.categories.map(categoryLabel).join(', ');
+    const thumbCat = h.categories[0];
+    const row = document.createElement('div');
+    row.className = 'undo-history-row';
+    row.innerHTML = `
+      <img src="/api/category_photo/${encodeURIComponent(thumbCat)}/${encodeURIComponent(h.file)}?size=120" loading="lazy">
+      <div class="undo-history-info">
+        <div class="text-truncate" title="${h.file}">${h.file}</div>
+        <div class="small text-muted">filed as ${catLabels}</div>
+      </div>
+      <button class="btn btn-sm btn-outline-warning"><i class="bi bi-arrow-counterclockwise"></i> Undo this</button>`;
+    row.querySelector('button').addEventListener('click', () => undoSpecific(h.file));
+    list.appendChild(row);
+  }
+}
+
+async function undoSpecific(fname) {
+  await apiPost('/api/undo_specific', {file: fname});
+  await loadUndoHistory();
+  await refreshState();
+}
+
 async function renameCategory(oldName) {
   const newName = prompt('Edit the name and press OK:', oldName);
   if (!newName || newName === oldName) return;
@@ -728,11 +935,80 @@ async function deleteCategory(category) {
 }
 
 async function openFolder(category) {
+  // host-only, only meaningful on the machine actually running the server --
+  // kept as a secondary action inside the gallery modal (openCategoryGallery
+  // below) for devices that can't reach the host's Explorer at all
   await api('/api/open_folder', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({category})
   });
 }
+
+// ---------- category gallery: full-screen browse of everything filed in one category ----------
+let galleryCategory = null;
+
+async function openCategoryGallery(category) {
+  galleryCategory = category;
+  document.getElementById('galleryTitle').textContent = categoryLabel(category);
+  document.getElementById('galleryOpenExplorerBtn').classList.toggle('d-none', !isHost);
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('categoryGalleryModal')).show();
+  await loadCategoryGallery();
+}
+
+async function loadCategoryGallery() {
+  if (!galleryCategory) return;
+  const r = await api(`/api/category_files?category=${encodeURIComponent(galleryCategory)}`);
+  const grid = document.getElementById('galleryGrid');
+  grid.innerHTML = '';
+  document.getElementById('galleryCount').textContent = `${r.files.length} photo${r.files.length === 1 ? '' : 's'}`;
+  if (!r.files.length) {
+    grid.innerHTML = '<div class="text-muted small p-2">No photos in this category yet.</div>';
+    return;
+  }
+  for (const fname of r.files) {
+    const item = document.createElement('div');
+    item.className = 'gallery-thumb';
+    item.innerHTML = `
+      <div class="gallery-thumb-imgwrap">
+        <img src="/api/category_photo/${encodeURIComponent(galleryCategory)}/${encodeURIComponent(fname)}?size=300" loading="lazy">
+        <button class="btn btn-sm btn-danger gallery-del-btn" title="Remove from this category (back to unsorted)"><i class="bi bi-trash"></i></button>
+      </div>
+      <div class="gallery-fname text-truncate" title="${fname}">${fname}</div>`;
+    item.querySelector('img').addEventListener('click', () => openGalleryLightbox(galleryCategory, fname));
+    item.querySelector('.gallery-del-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      unfilePhoto(galleryCategory, fname);
+    });
+    grid.appendChild(item);
+  }
+}
+
+async function unfilePhoto(category, fname) {
+  if (!confirm(`Remove "${fname}" from ${categoryLabel(category)}? It goes back to unsorted -- the original photo is untouched.`)) return;
+  await api('/api/unfile', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({category, file: fname})
+  });
+  await loadCategoryGallery();
+  await refreshState();  // the category strip's count/thumb may have changed
+}
+
+function openGalleryLightbox(category, fname) {
+  const img = document.getElementById('lightboxImg');
+  img.style.transform = '';  // filed copies are already correctly rotated -- no CSS transform needed
+  img.src = `/api/category_photo/${encodeURIComponent(category)}/${encodeURIComponent(fname)}?size=2400`;
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('lightboxModal')).show();
+}
+
+function applyGalleryThumbSize(px) {
+  document.documentElement.style.setProperty('--gallery-thumb-w', px + 'px');
+  localStorage.setItem('galleryThumbW', px);
+  document.querySelectorAll('#gallerySizeGroup .btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(`gallerySize${px}`);
+  if (btn) btn.classList.add('active');
+}
+function setGalleryThumbSize(px) { applyGalleryThumbSize(px); }
+applyGalleryThumbSize(parseInt(localStorage.getItem('galleryThumbW'), 10) || 160);
 
 async function syncFromDisk() {
   const r = await api('/api/sync', {method: 'POST'});

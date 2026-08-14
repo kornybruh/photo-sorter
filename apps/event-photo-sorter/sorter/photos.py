@@ -8,6 +8,11 @@ from PIL import Image, ImageOps
 
 from . import config
 
+# these are the user's own local event photos (e.g. big panoramas/high-res
+# DSLR shots), not untrusted uploads -- PIL's decompression-bomb guard is
+# meant for the latter and was rejecting legitimate large photos here
+Image.MAX_IMAGE_PIXELS = None
+
 
 def list_files():
     return sorted(

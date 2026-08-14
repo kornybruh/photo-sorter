@@ -43,13 +43,26 @@ def load_room():
                 room = json.load(f)
             room.setdefault("sections", 1)
             room.setdefault("assignments", {})
-            room.setdefault("last_assigned", {})
+            room.setdefault("undo_stack", {})
+            room.setdefault("last_seen", {})
             return room
         except Exception:
             pass
-    return {"sections": 1, "assignments": {}, "last_assigned": {}}
+    return {"sections": 1, "assignments": {}, "undo_stack": {}, "last_seen": {}}
 
 
 def save_room(room):
     with open(config.ROOM_FILE, "w") as f:
         json.dump(room, f, indent=2)
+
+
+def load_rotations():
+    if os.path.exists(config.ROTATIONS_FILE):
+        with open(config.ROTATIONS_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+
+def save_rotations(rotations):
+    with open(config.ROTATIONS_FILE, "w") as f:
+        json.dump(rotations, f, indent=2)

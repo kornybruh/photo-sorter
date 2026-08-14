@@ -19,15 +19,17 @@ SORTED_DIR = None
 PROGRESS_FILE = None
 SKIPPED_FILE = None
 ROOM_FILE = None
+ROTATIONS_FILE = None
 
 
 def set_active_folder(path):
-    global SRC, SORTED_DIR, PROGRESS_FILE, SKIPPED_FILE, ROOM_FILE
+    global SRC, SORTED_DIR, PROGRESS_FILE, SKIPPED_FILE, ROOM_FILE, ROTATIONS_FILE
     SRC = os.path.abspath(path)
     SORTED_DIR = os.path.join(SRC, "sorted")
     PROGRESS_FILE = os.path.join(SORTED_DIR, "manual_progress.json")
     SKIPPED_FILE = os.path.join(SORTED_DIR, "skipped.json")
     ROOM_FILE = os.path.join(SORTED_DIR, "multiplayer_room.json")
+    ROTATIONS_FILE = os.path.join(SORTED_DIR, "rotations.json")
     os.makedirs(SORTED_DIR, exist_ok=True)
     try:
         with open(LAST_FOLDER_FILE, "w", encoding="utf-8") as f:

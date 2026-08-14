@@ -22,26 +22,32 @@
 <div class="container-fluid">
   <div id="stickyTop">
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-      <h4 class="m-0"><i class="bi bi-images"></i> Event Photo Sorter</h4>
+      <h4 class="m-0"><i class="bi bi-images"></i> Event Photo Sorter
+        <span class="badge text-bg-secondary" style="font-size:.55rem; vertical-align:middle;" title="Bumped on every update -- if this doesn't match what you expect, the server needs a full restart, not just a page refresh">v3</span>
+      </h4>
       <div class="d-flex align-items-center gap-2">
-        <span id="sectionBadge" class="badge text-bg-dark badge-progress d-none"></span>
-        <span id="myProgressBadge" class="badge text-bg-info badge-progress d-none"></span>
-        <span id="sessionTimer" class="badge text-bg-dark badge-progress" title="Time since you opened this page"><i class="bi bi-stopwatch"></i> 00:00:00</span>
-        <button id="multiplayerBtn" class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#multiplayerModal" title="Multiplayer progress">
-          <i class="bi bi-people-fill"></i>
-        </button>
-        <button id="bulkModeBtn" class="btn btn-sm btn-outline-light" onclick="toggleBulkMode()" title="Bulk select mode">
-          <i class="bi bi-grid-3x3-gap"></i>
-        </button>
-        <button class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#settingsModal" title="Settings">
-          <i class="bi bi-gear"></i>
-        </button>
-        <button class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#helpModal" title="Help">
-          <i class="bi bi-question-circle"></i>
-        </button>
-        <button class="btn btn-sm btn-outline-light" onclick="toggleTheme()" title="Toggle light/dark theme">
-          <i class="bi bi-moon-stars" id="themeIcon"></i>
-        </button>
+        <div class="status-cluster">
+          <span id="sectionBadge" class="status-seg d-none"></span>
+          <span id="myProgressBadge" class="status-seg d-none"></span>
+          <span id="sessionTimer" class="status-seg" title="Time since you opened this page"><i class="bi bi-stopwatch"></i> 00:00:00</span>
+        </div>
+        <div class="btn-group" role="group">
+          <button id="multiplayerBtn" class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#multiplayerModal" title="Multiplayer progress">
+            <i class="bi bi-people-fill"></i>
+          </button>
+          <button id="bulkModeBtn" class="btn btn-sm btn-outline-light" onclick="toggleBulkMode()" title="Bulk select mode">
+            <i class="bi bi-grid-3x3-gap"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#settingsModal" title="Settings">
+            <i class="bi bi-gear"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#helpModal" title="Help">
+            <i class="bi bi-question-circle"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-light" onclick="toggleTheme()" title="Toggle light/dark theme">
+            <i class="bi bi-moon-stars" id="themeIcon"></i>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -56,15 +62,35 @@
       <div id="stripOuter" class="mb-1"></div>
       <div id="stripResizeHandle" class="mb-2" title="Drag to resize the category cards"></div>
 
-      <div class="toolbar d-flex flex-wrap gap-2 mb-3">
-        <button class="btn btn-warning" onclick="customCategory()"><i class="bi bi-plus-circle"></i> Custom category...</button>
-        <button class="btn btn-outline-light" onclick="toggleLayout()" title="Switch layout (Preview & Category)">
-          <i class="bi bi-arrow-down-up"></i> Switch layout
-        </button>
-        <button class="btn btn-info" onclick="syncFromDisk()"><i class="bi bi-arrow-repeat"></i> Sync from disk</button>
+      <div class="toolbar-primary d-flex flex-wrap gap-2 mb-2">
+        <button class="btn btn-primary" onclick="customCategory()"><i class="bi bi-plus-circle"></i> Custom category...</button>
         <button class="btn btn-secondary" onclick="skip()"><i class="bi bi-skip-forward"></i> Skip</button>
         <button class="btn btn-outline-warning" onclick="undo()"><i class="bi bi-arrow-counterclockwise"></i> Undo</button>
+        <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#undoHistoryModal" title="See recent picks and undo a specific one">
+          <i class="bi bi-clock-history"></i>
+        </button>
+      </div>
+
+      <div class="toolbar-secondary d-flex flex-wrap align-items-center gap-2 mb-3">
+        <div class="btn-group" role="group">
+          <button id="multiCatModeBtn" class="btn btn-outline-light" onclick="toggleMultiCatMode()" title="File the current photo into more than one category">
+            <i class="bi bi-collection"></i> Multi-category
+          </button>
+          <button class="btn btn-outline-light" onclick="toggleLayout()" title="Switch layout (Preview & Category)">
+            <i class="bi bi-arrow-down-up"></i> Switch layout
+          </button>
+          <button class="btn btn-outline-light" onclick="syncFromDisk()" title="Reconcile progress if you deleted photos via Explorer">
+            <i class="bi bi-arrow-repeat"></i> Sync from disk
+          </button>
+        </div>
         <button id="clearAllBtn" class="btn btn-danger ms-auto d-none" onclick="clearAll()"><i class="bi bi-trash3"></i> Clear All</button>
+      </div>
+
+      <div id="multiCatBar" class="d-none d-flex flex-wrap align-items-center gap-2 mb-3 p-2"
+           style="background:var(--card); border:1px solid var(--border); border-radius:var(--r-md);">
+        <span class="small text-muted">Multi-category mode: click every category this photo belongs to, then</span>
+        <span id="multiCatCount" class="badge text-bg-info badge-progress">0 selected</span>
+        <button class="btn btn-sm btn-primary" onclick="assignMultiCategory()"><i class="bi bi-check2-all"></i> File into selected</button>
       </div>
     </div>
 
@@ -79,8 +105,11 @@
             <div class="mt-2 fs-5">All photos reviewed (in your section)!</div>
           </div>
           <div class="photo-zoom-controls">
+            <button class="btn btn-sm btn-outline-light" onclick="rotatePhoto(-90)" title="Rotate left"><i class="bi bi-arrow-counterclockwise"></i></button>
+            <button class="btn btn-sm btn-outline-light" onclick="rotatePhoto(90)" title="Rotate right"><i class="bi bi-arrow-clockwise"></i></button>
             <button class="btn btn-sm btn-outline-light" onclick="changePhotoSize(-6)" title="Smaller preview"><i class="bi bi-dash-lg"></i></button>
             <button class="btn btn-sm btn-outline-light" onclick="changePhotoSize(6)" title="Bigger preview"><i class="bi bi-plus-lg"></i></button>
+            <button class="btn btn-sm btn-danger" onclick="deleteOriginalPhoto()" title="Permanently delete this photo from disk (not just a sorted copy)"><i class="bi bi-trash3"></i></button>
           </div>
         </div>
       </div>
@@ -207,6 +236,48 @@
   </div>
 </div>
 
+<!-- Undo History: what you've filed lately in this section, undo any one of them -->
+<div class="modal fade" id="undoHistoryModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-clock-history"></i> Undo History</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted">Your last few picks in this section, most recent first.</p>
+        <div id="undoHistoryList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Category gallery: full-screen browse of everything filed in one category -->
+<div class="modal fade" id="categoryGalleryModal" tabindex="-1">
+  <div class="modal-dialog modal-fullscreen">
+    <div class="modal-content">
+      <div class="modal-header flex-wrap gap-2">
+        <h5 class="modal-title me-2 mb-0">
+          <i class="bi bi-folder2-open"></i> <span id="galleryTitle"></span>
+          <span id="galleryCount" class="badge text-bg-dark badge-progress ms-2">0 photos</span>
+        </h5>
+        <div class="btn-group btn-group-sm" id="gallerySizeGroup" role="group">
+          <button id="gallerySize90" class="btn btn-outline-light" onclick="setGalleryThumbSize(90)" title="Small"><i class="bi bi-grid-3x3-gap-fill"></i></button>
+          <button id="gallerySize160" class="btn btn-outline-light" onclick="setGalleryThumbSize(160)" title="Medium"><i class="bi bi-grid-3x3-gap"></i></button>
+          <button id="gallerySize260" class="btn btn-outline-light" onclick="setGalleryThumbSize(260)" title="Large"><i class="bi bi-square"></i></button>
+        </div>
+        <button id="galleryOpenExplorerBtn" class="btn btn-sm btn-outline-light d-none" onclick="openFolder(galleryCategory)" title="Only works when opened on the host computer itself">
+          <i class="bi bi-folder-symlink"></i> Open in Explorer
+        </button>
+        <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="galleryGrid"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Lightbox -->
 <div class="modal fade" id="lightboxModal" tabindex="-1">
   <div class="modal-dialog modal-fullscreen">
@@ -290,6 +361,9 @@
         <button class="btn btn-outline-light btn-sm" onclick="choosePhotoFolder()">
           <i class="bi bi-folder2-open"></i> Change photo folder
         </button>
+        <button class="btn btn-outline-light btn-sm" onclick="exportSummary()">
+          <i class="bi bi-file-earmark-spreadsheet"></i> Export summary (CSV)
+        </button>
         <div class="mt-3">
           <div class="small text-muted">Share this with others on your WiFi so they can sort too:</div>
           <div class="input-group mt-1">
@@ -327,6 +401,9 @@
               one click, good for near-identical burst shots.</li>
           <li><b>Skip</b> leaves a photo for later; skipped photos come back into rotation once everything
               else is decided. <b>Undo</b> reverts your last decision.</li>
+          <li>Keyboard: arrow keys move a highlight along the category strip (works in any layout), and
+              <b>Enter</b> files the current photo (or your bulk selection) into whichever category is
+              highlighted.</li>
           <li><b>Sync from disk</b> reconciles progress if you deleted photos via Explorer.
               <b>Clear All</b> wipes every sorted folder + progress for everyone (only the copies -- originals
               are always safe) -- it asks for confirmation, and only works from the host PC itself, not from

@@ -82,13 +82,27 @@ code, .mono { font-family: var(--font-mono); }
 #sideResizeHandle:hover, #sideResizeHandle.dragging-active {
   background: var(--border); color: var(--accent);
 }
-/* action buttons move to the top of the side column, right-aligned */
-#layoutFlex.layout-side #categoryZone .toolbar {
-  order: -1; justify-content: flex-end; margin-bottom: .75rem;
+/* header status pill: section/progress/timer read as one grouped control
+   instead of three independent floating badges */
+.status-cluster {
+  display: flex; align-items: stretch; background: var(--card);
+  border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden;
 }
+.status-seg {
+  display: flex; align-items: center; gap: .3rem; padding: .3rem .65rem;
+  font-family: var(--font-mono); font-size: .8rem; font-weight: 600; color: var(--text);
+  border-right: 1px solid var(--border); white-space: nowrap;
+}
+.status-seg:last-child { border-right: none; }
+/* action buttons move to the top of the side column -- left-aligned like
+   everywhere else, just reordered above the strip; forcing them right
+   (flex-end) fought with wrapping in the narrow side column and produced a
+   staggered, inconsistent look */
+#layoutFlex.layout-side #categoryZone .toolbar-primary { order: -2; margin-bottom: .5rem; }
+#layoutFlex.layout-side #categoryZone .toolbar-secondary { order: -1; margin-bottom: .75rem; }
 /* in the narrow side-column, ms-auto's "push to the far right" doesn't
    read well once the toolbar wraps -- let it sit inline like every other button */
-#layoutFlex.layout-side .toolbar .btn.ms-auto { margin-left: 0; }
+#layoutFlex.layout-side .toolbar-secondary .btn.ms-auto { margin-left: 0; }
 /* the strip becomes a wrapping multi-row grid instead of one scrolling row */
 #layoutFlex.layout-side #stripOuter {
   max-height: 60vh; overflow-y: auto; overflow-x: hidden; white-space: normal;
@@ -114,13 +128,51 @@ code, .mono { font-family: var(--font-mono); }
 #stripOuter::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 :root { --cat-card-w: 130px; --cat-thumb-h: 90px; }
 .cat-card {
-  display: inline-block; vertical-align: top; width: var(--cat-card-w);
+  position: relative; display: inline-block; vertical-align: top; width: var(--cat-card-w);
   background: var(--card); border: 1px solid var(--border); border-radius: var(--r-md); padding: .5rem;
   margin-right: .6rem; cursor: pointer; transition: transform .12s ease, box-shadow .12s ease;
-  white-space: normal;
+  white-space: normal; box-shadow: 0 1px 4px rgba(0, 0, 0, .10);
 }
-.cat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0, 67, 151, .18); }
+.cat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0, 67, 151, .22); }
 .cat-card.drag-over { outline: 2px dashed var(--accent); }
+.cat-card.kbd-focus { outline: 3px solid var(--accent); outline-offset: 1px; box-shadow: 0 6px 18px rgba(0, 67, 151, .28); }
+.cat-card.multi-selected { outline: 3px solid #4ade80; outline-offset: 1px; }
+.cat-card.multi-selected::after {
+  content: "\2713"; position: absolute; top: 6px; right: 6px; width: 20px; height: 20px;
+  background: #4ade80; color: #06280f; border-radius: 50%; font-size: .75rem; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+#multiCatModeBtn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+#photo, #lightboxImg { transition: transform .2s ease; }
+
+:root { --gallery-thumb-w: 160px; }
+#galleryGrid {
+  display: flex; flex-wrap: wrap; align-content: flex-start; gap: .75rem;
+  height: 100%; overflow-y: auto; padding-top: .25rem;
+}
+.gallery-thumb { width: var(--gallery-thumb-w); }
+.gallery-thumb-imgwrap { position: relative; }
+.gallery-thumb img {
+  width: 100%; height: var(--gallery-thumb-w); object-fit: cover; border-radius: var(--r-xs);
+  background: #000; cursor: zoom-in; display: block; box-shadow: 0 1px 5px rgba(0, 0, 0, .18);
+}
+.gallery-del-btn {
+  /* always visible, not hover-gated -- this app runs on phones/tablets as
+     much as desktops, and touch has no hover state */
+  position: absolute; top: 5px; right: 5px; padding: .2rem .4rem; opacity: .85;
+}
+.gallery-del-btn:hover { opacity: 1; }
+.gallery-thumb .gallery-fname { font-size: .68rem; color: var(--text-muted); margin-top: .3rem; text-align: center; }
+#gallerySizeGroup .btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.undo-history-row {
+  display: flex; align-items: center; gap: .6rem; padding: .5rem;
+  border: 1px solid var(--border); border-radius: var(--r-sm); margin-bottom: .5rem;
+  background: var(--card);
+}
+.undo-history-row img { width: 56px; height: 42px; object-fit: cover; border-radius: var(--r-xs); background: #000; flex-shrink: 0; }
+.undo-history-info { flex: 1; min-width: 0; }
+.undo-history-row button { flex-shrink: 0; }
 .cat-card img { width: 100%; height: var(--cat-thumb-h); object-fit: cover; border-radius: var(--r-xs); background: #000; }
 .cat-card .noimg { width: 100%; height: var(--cat-thumb-h); display: flex; align-items: center; justify-content: center; background: var(--track); border-radius: var(--r-xs); color: var(--text-muted); }
 .cat-card.is-cooling { opacity: .55; pointer-events: none; }
@@ -180,10 +232,16 @@ code, .mono { font-family: var(--font-mono); }
 }
 .mp-card {
   background: var(--card); border: 1px solid var(--border); border-radius: var(--r-md); padding: .6rem .8rem;
-  min-width: 170px; flex: 1 1 170px; border-left: 4px solid;
+  min-width: 170px; flex: 1 1 170px; border-left: 4px solid; box-shadow: 0 1px 4px rgba(0, 0, 0, .10);
 }
 .mp-card .mp-bar-wrap { height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; margin-top: .4rem; }
 .mp-card .mp-bar-fill { height: 100%; transition: width .4s ease; }
+.mp-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: .4rem;
+  vertical-align: middle;
+}
+.mp-dot-online { background: #4ade80; box-shadow: 0 0 4px #4ade80; }
+.mp-dot-offline { background: var(--border); }
 
 /* bootstrap surface polish to match the token system */
 .modal-content { background: var(--panel); color: var(--text); border-radius: var(--r-lg); border: 1px solid var(--border); }

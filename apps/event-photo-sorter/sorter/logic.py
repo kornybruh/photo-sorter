@@ -12,14 +12,22 @@ def sanitize_name(name):
     return "".join(ch for ch in (name or "").strip() if ch not in invalid)
 
 
+def categories_of(entry):
+    """A progress[fname] value is normally a single category string, but a
+    photo filed into multiple categories at once (see /api/assign_multi)
+    stores a list instead -- this normalizes either shape to a list."""
+    return entry if isinstance(entry, list) else [entry]
+
+
 def existing_categories(progress):
     cats = []
     if os.path.exists(config.SORTED_DIR):
         cats = [d for d in os.listdir(config.SORTED_DIR)
                 if os.path.isdir(os.path.join(config.SORTED_DIR, d))]
     counts = {}
-    for c in progress.values():
-        counts[c] = counts.get(c, 0) + 1
+    for entry in progress.values():
+        for c in categories_of(entry):
+            counts[c] = counts.get(c, 0) + 1
     cats = [c for c in cats if counts.get(c, 0) > 0]
     if config.TRASH_CATEGORY not in cats:
         cats.append(config.TRASH_CATEGORY)  # always shown, even empty
@@ -40,8 +48,8 @@ def existing_categories(progress):
 
 def category_last_photo(progress, cat):
     last = None
-    for fname, c in progress.items():
-        if c == cat:
+    for fname, entry in progress.items():
+        if cat in categories_of(entry):
             last = fname
     return last
 
