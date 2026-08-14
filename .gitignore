@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+
+# app-generated, machine-specific -- never belongs in the repo
+apps/event-photo-sorter/last_folder.json
+
+# just in case anyone ever runs the app from inside this repo by mistake
+sorted/
+manual_progress.json
+skipped.json
+multiplayer_room.json
